@@ -94,17 +94,29 @@ class testPluginDialog(QDialog,testPlugin_guiNew.Ui_Dialog):
         pStartB= pointListB[0].geometry().asPoint()
         pEndA= pointListA[-1].geometry().asPoint()
         pEndB= pointListA[-1].geometry().asPoint()
-        eq,third = deploy(pLayerA,pStartA,pLayerB,pStartB)
+        #temporary
+        #eq,third = deploy(pLayerA,pStartA,pLayerB,pStartB)
         # circumCenter function with threePointList as input. output cc_midPointList
-        cc_midPointList=[]
-        midStart = midPoint(pStartA,pStartB)        # create start point for equidistant line. hasn't been ch
-        midEnd=midPoint(pEndA,pEndB)                # create end point for equidistant line
-        cc_midPointList.append(QgsPoint(midStart[0],midStart[1]))            # insert first item to list
-        for i in third:
-            O = circumCenter(i[0],i[1],i[2])
-            #geom = QgsGeometry().fromPoint(O)
-            cc_midPointList.append(O)
-        cc_midPointList.append(QgsPoint(midEnd[0],midEnd[1]))              # insert last item to list
+        #temporary
+        #cc_midPointList=[]
+        #midStart = midPoint(pStartA,pStartB)        # create start point for equidistant line. hasn't been ch
+        #midEnd = midPoint(pEndA,pEndB)                # create end point for equidistant line
+        drct = direction(pStartA,pStartB,pEndA,pEndB)
+        ppLine = perpendicularLine(pStartA,pStartB,drct,pLayerA,pLayerB)
+        lineLayer = QgsVectorLayer("LineString","Line Result", "memory")
+        lFeat = QgsFeature()
+        lFeat.setGeometry(ppLine)
+        lineProv = lineLayer.dataProvider()
+        lineProv.addFeatures([lFeat])
+        QgsMapLayerRegistry.instance().addMapLayer(lineLayer)
+
+        #temporary
+        #cc_midPointList.append(QgsPoint(midStart[0],midStart[1]))            # insert first item to list
+        #temporary
+        #for i in third:
+        #    O = circumCenter(i[0],i[1],i[2])
+        #    cc_midPointList.append(O)
+        #cc_midPointList.append(QgsPoint(midEnd[0],midEnd[1]))              # insert last item to list
 
         # line_from_point with midPointList as input. output ed_line_v1
 
@@ -112,8 +124,9 @@ class testPluginDialog(QDialog,testPlugin_guiNew.Ui_Dialog):
         
         #for i in eq:
         #    cc_midPointList.append(i.asPoint())
-        pointToLine(cc_midPointList)
-        self.textBrowser.append(str(len(cc_midPointList)))
+        #temporary
+        #pointToLine(cc_midPointList)
+        #self.textBrowser.append(str(len(cc_midPointList)))
         '''for i in cc_midPointList:
             self.textBrowser.append(str(i))'''
         # compare ver1 vs ver2

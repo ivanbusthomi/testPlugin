@@ -52,7 +52,6 @@ def lineToPoint(lineLayer,attr):                                       # STATUS 
         QgsMapLayerRegistry.instance().addMapLayer(pointLayer)                      #add to defined point layer
     return pointLayer
 
-
 def pointToLine(pointList):                                    # STATUS : working      OUTPUT : memory layer
     # function to convert point features to line feature
     #canvas = iface.mapCanvas()
@@ -78,11 +77,6 @@ def midPoint(point1,point2):        # working fine
     yMid=y1+(y2-y1)/2.0
     mid=(xMid,yMid)
     return mid
-
-#def pointInLine(line):
-    # this function will return nearest poin within a line, and take mouse click position as input.
-    # similiar with perpendicular line creation,
-    # param 1 type is polyline layer
 
 def direction(pStartA,pStartB,pEndA,pEndB):
     # this function is to dynamically define direction for perpendicular line creation
@@ -283,7 +277,7 @@ def deploy(p_LayerA,pStartA,p_LayerB,pStartB):
     pIterB = pStartB
     stop = 0
     while stop ==0 :
-        m,n,stop = iteratePoint(pIterA,pIterB,jLayer,100,p_LayerA,p_LayerB)
+        m,n,stop = iteratePoint(pIterA,pIterB,jLayer,10,p_LayerA,p_LayerB)
         #print stop
         jLayer = removePoint(jLayer,pIterA,pIterB,n)
         if stop ==0:
