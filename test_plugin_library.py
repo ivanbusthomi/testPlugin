@@ -98,7 +98,7 @@ def direction(pStartA,pStartB,pEndA,pEndB):
             dir_ = 4
     return dir_
 
-def perpendicularLine(pointA,pointB,dir_,pLayerA,pLayerB):
+def perpendicularLine(pointA,pointB,pLayerA,pLayerB,dir_):
     # this function is to find a line that is perpendicular to line AB at its midpoint
     # param 1 and 2 type is point
     x1 = pointA.x()
@@ -112,26 +112,30 @@ def perpendicularLine(pointA,pointB,dir_,pLayerA,pLayerB):
     ym = middlePoint.y()
     #-------------------------------------
     # get max extent value from both point layer
-    extA = pLayerA.extent()     #global variable
-    extB = pLayerB.extent()     #global variable
+    extA = pLayerA.extent()          #global
+    extB = pLayerB.extent()          #global
     #maximum value
     if extA.xMaximum() > extB.xMaximum():               #define xmax
         xmax = extA.xMaximum()
     else:
         xmax = extB.xMaximum()
+
     if extA.xMinimum() < extB.xMinimum():               #define xmin
         xmin = extA.xMinimum()
     else:
         xmin = extB.xMinimum()
+
     #minimum value
-    if extA.yMaximum() > extB.yMaximum():               #define xmax
+    if extA.yMaximum() > extB.yMaximum():               #define ymax
         ymax = extA.yMaximum()
     else:
         ymax = extB.yMaximum()
-    if extA.yMinimum() < extB.yMinimum:                 #define xmax
+
+    if extA.yMinimum() < extB.yMinimum():                 #define ymin
         ymin = extA.yMinimum()
     else:
         ymin = extB.yMinimum()
+
     # in order to shorten the equation
     P = x2 - x1
     Q = y2 - y1
@@ -152,24 +156,33 @@ def perpendicularLine(pointA,pointB,dir_,pLayerA,pLayerB):
     # we want the perpendicular line goes until the maximum value of pointA and B, just to make sure it works
     # in any shape of topography,,,,,,,,,, or maybe minimum value of pointA and B. need more consideration later.
     if dir_ == 1:                  # line direction is up-right
-        xlim = xmax
-        ylim = ymax
+        if math.pow(gradien2,2)>1:
+            y3 = ymax
+            x3 = ((-Q)*y3 + P*x1 + Q*y1 + u*d2) / P
+        elif math.pow(gradien2,2)<1:
+            x3 = xmax
+            y3 = ((-P)*x3 + P*x1 + Q*y1 + u*d2) / Q
     elif dir_ == 2:                # line direction is down-right
-        xlim = xmax
-        ylim = ymin
+        if math.pow(gradien2,2)>1:
+            y3 = ymin
+            x3 = ((-Q)*y3 + P*x1 + Q*y1 + u*d2) / P
+        elif math.pow(gradien2,2)<1:
+            x3 = xmax
+            y3 = ((-P)*x3 + P*x1 + Q*y1 + u*d2) / Q
     elif dir_ == 3:                # line direction is up-left
-        xlim = xmin
-        ylim = ymax
+        if math.pow(gradien2,2)>1:
+            y3 = ymax
+            x3 = ((-Q)*y3 + P*x1 + Q*y1 + u*d2) / P
+        elif math.pow(gradien2,2)<1:
+            x3 = xmin
+            y3 = ((-P)*x3 + P*x1 + Q*y1 + u*d2) / Q
     elif dir_ == 4:                # line direction is down-left
-        xlim = xmin
-        ylim = ymin
-    #--------------------------------------------------------
-    if math.pow(gradien2,2) > 1:                        #define x3 and y3, which are the second point coordinates of ppLine
-        y3 = ylim
-        x3 = ((-Q)*y3 + P*x1 + Q*y1 + u*d2) / P
-    else:
-        x3 = xlim
-        y3 = ((-P)*x3 + P*x1 + Q*y1 + u*d2) / Q
+        if math.pow(gradien2,2)>1:
+            y3 = ymin
+            x3 = ((-Q)*y3 + P*x1 + Q*y1 + u*d2) / P
+        elif math.pow(gradien2,2)<1:
+            x3 = xmin
+            y3 = ((-P)*x3 + P*x1 + Q*y1 + u*d2) / Q
     #-------------------------------------
     ppdPoint = QgsPoint(x3,y3)                          # create it as Point
     pointList = []                                      # create list to contain point for line creation
@@ -177,7 +190,7 @@ def perpendicularLine(pointA,pointB,dir_,pLayerA,pLayerB):
     pointList.append(ppdPoint)                          # insert 2nd point, the one we just calculate
     #-------------------------------------
     p3Line = QgsGeometry.fromPolyline(pointList)        # create line geometry from list of point
-    return p3Line                                               # return the result.its type is QgsGeometry
+    return p3Line   #,xmax,ymax,xmin,ymin                                               # return the result.its type is QgsGeometry
 
 def nearestPoint(point, points):                                # STATUS working
     import math                                                 # param1 = point, param 2=list of features
@@ -193,22 +206,6 @@ def nearestPoint(point, points):                                # STATUS working
 def distanceFromPoints(point1,point2):
     import math
     return math.sqrt(point1.sqrDist(point2))
-
-"""
-def pointAlongLine(intv, line):
-    # this function will create geometry point along line at the specified distance
-    length = line.length()
-    cDistance = intv
-    features = []
-    while cDistance < length:
-        point = line.interpolate(cDistance)
-        feat = QgsFeature()
-        feat.setGeometry(point)
-        features.append(feat)
-        #increase
-        cDistance = cDistance + intv
-    return features
-"""
 
 def join(pLayerA,pLayerB):
     # join two points layer
@@ -230,25 +227,27 @@ def intersected(geom,list_of_feat):           #STATUS : working
             list_of_result.append(f)
     return list_of_result
 
-def iteratePoint(startA,startB,jLayer,itv,pLayerA,pLayerB):
-    # param 1 and 2 type is point, param 3 and 4 type is point Layer, param 5 type is integer
-    # output two list which contain list of three points (list_threePoint),
-    # and list of equidistance point result (list_equiPoint)
-    # p = point type, g=geom type , f = feature type
-    g_ppLine = perpendicularLine(startA,startB,1,pLayerA,pLayerB)   # create ppLine geom
+def iteratePoint(startA,startB,pEndA,pEndB,pLayerA,pLayerB,itv):
+    #param 1 and 2 type is point, param 3 and 4 type i point Layer, param 5 type is integer
+    #output two list which contain list of three points (list_threePoint),
+    #and list of equidistance point result (list_equiPoint)
+    #p = point type, g=geom type , f = feature type
+    dir_ = direction(startA,startB,pEndA,pEndB)                          #                                           OK
+    g_ppLine = perpendicularLine(startA,startB,pLayerA,pLayerB,dir_)   # create ppLine geom                             OK
+    joinLayer = join(pLayerA,pLayerB)                                                                                      #OK
     cDistance = 0                                 # current distance. used for creating point along ppLine geom
     stop = 0
     r=QgsFeature()
-    eG = QgsGeometry()
+    #equiGeom = QgsGeometry()
     while cDistance < g_ppLine.length():
-        eG = g_ppLine.interpolate(cDistance)        # equidistance point candidate
+        equiGeom = g_ppLine.interpolate(cDistance)        # equidistance point candidate
         #eG = QgsGeometry.fromPoint(eP)              # geometry eP
-        dA = distanceFromPoints(startA, eG.asPoint())
-        buffer = eG.buffer(dA,15)
-        res =  intersected(buffer,jLayer)
+        dA = distanceFromPoints(startA, equiGeom.asPoint())
+        buffer = equiGeom.buffer(dA,15)
+        res =  intersected(buffer,joinLayer)
         cDistance = cDistance + itv
         if len(res)>1:
-            r=nearestPoint(eG.asPoint(),res)
+            r=nearestPoint(equiGeom.asPoint(),res)
             break
         elif len(res)==1:
             r=res[0]
@@ -257,7 +256,7 @@ def iteratePoint(startA,startB,jLayer,itv,pLayerA,pLayerB):
             continue
     else:
         stop = 1
-    return eG,r, stop
+    return equiGeom,r, stop
 
 def removePoint(jLayer,p1,p2,f):
     for j in jLayer:
@@ -269,25 +268,25 @@ def removePoint(jLayer,p1,p2,f):
             jLayer.remove(j)
     return jLayer
 
-def deploy(p_LayerA,pStartA,p_LayerB,pStartB):
+def deploy(pStartA,pStartB,pEndA,pEndB,pLayerA,pLayerB,itv):
     list_equiPoint = []
     list_thirdPoint = []
-    jLayer = join(p_LayerA,p_LayerB)
+    jLayer = join(pLayerA,pLayerB)
     pIterA = pStartA
     pIterB = pStartB
     stop = 0
     while stop ==0 :
-        m,n,stop = iteratePoint(pIterA,pIterB,jLayer,10,p_LayerA,p_LayerB)
+        eqPoint,thirdPoint,stop = iteratePoint(pIterA,pIterB,pEndA,pEndB,pLayerA,pLayerB,itv)
         #print stop
-        jLayer = removePoint(jLayer,pIterA,pIterB,n)
+        jLayer = removePoint(jLayer,pIterA,pIterB,thirdPoint)
         if stop ==0:
-            list_thirdPoint.append([pIterA, pIterB, n.geometry().asPoint()])
-            list_equiPoint.append(m)
-            if n['ket']=='A':
-                pIterA=n.geometry().asPoint()
+            list_thirdPoint.append([pIterA, pIterB, thirdPoint.geometry().asPoint()])
+            list_equiPoint.append(eqPoint)
+            if thirdPoint['ket']=='A':
+                pIterA=thirdPoint.geometry().asPoint()
                 #print "A changed",pIterA,n['fid']
-            elif n['ket']=='B':
-                pIterB=n.geometry().asPoint()
+            elif thirdPoint['ket']=='B':
+                pIterB=thirdPoint.geometry().asPoint()
                 #print "B changed",pIterB,n['fid']
     else:
         pass

@@ -95,38 +95,48 @@ class testPluginDialog(QDialog,testPlugin_guiNew.Ui_Dialog):
         pEndA= pointListA[-1].geometry().asPoint()
         pEndB= pointListA[-1].geometry().asPoint()
         #temporary
-        #eq,third = deploy(pLayerA,pStartA,pLayerB,pStartB)
+        eq,third = deploy(pStartA,pStartB,pEndA,pEndB,pLayerA,pLayerB,50)
         # circumCenter function with threePointList as input. output cc_midPointList
-        #temporary
-        #cc_midPointList=[]
-        #midStart = midPoint(pStartA,pStartB)        # create start point for equidistant line. hasn't been ch
-        #midEnd = midPoint(pEndA,pEndB)                # create end point for equidistant line
-        drct = direction(pStartA,pStartB,pEndA,pEndB)
-        ppLine = perpendicularLine(pStartA,pStartB,drct,pLayerA,pLayerB)
+        # create list, start and end line
+        cc_midPointList=[]
+        midStart = midPoint(pStartA,pStartB)        # create start point for equidistant line. hasn't been ch
+        midEnd = midPoint(pEndA,pEndB)                # create end point for equidistant line
+        # insert element to list
+        cc_midPointList.append(QgsPoint(midStart[0],midStart[1]))            # insert first item to list
+        for i in third:
+            O = circumCenter(i[0],i[1],i[2])
+            cc_midPointList.append(O)
+        cc_midPointList.append(QgsPoint(midEnd[0],midEnd[1]))              # insert last item to list
+
+        # line_from_point with midPointList as input. output ed_line_v1
+
+        # line_from_point with cc_midPointList as input. output ed_line_v2
+        #-------------------------------------------------------------------
+        """ this section is for checking purpose
+        dir_ = direction(pStartA,pStartB,pEndA,pEndB)
+        ppLine,grad = perpendicularLine(pStartA,pStartB,pLayerA,pLayerB,dir_)
         lineLayer = QgsVectorLayer("LineString","Line Result", "memory")
         lFeat = QgsFeature()
         lFeat.setGeometry(ppLine)
         lineProv = lineLayer.dataProvider()
         lineProv.addFeatures([lFeat])
         QgsMapLayerRegistry.instance().addMapLayer(lineLayer)
-
-        #temporary
-        #cc_midPointList.append(QgsPoint(midStart[0],midStart[1]))            # insert first item to list
-        #temporary
-        #for i in third:
-        #    O = circumCenter(i[0],i[1],i[2])
-        #    cc_midPointList.append(O)
-        #cc_midPointList.append(QgsPoint(midEnd[0],midEnd[1]))              # insert last item to list
-
-        # line_from_point with midPointList as input. output ed_line_v1
-
-        # line_from_point with cc_midPointList as input. output ed_line_v2
-        
+        xx = pLayerA.extent().xMinimum()
+        yx = pLayerA.extent().yMinimum()
+        xn = pLayerB.extent().xMinimum()
+        yn = pLayerB.extent().yMinimum()
+        self.textBrowser.append(str(xx))
+        self.textBrowser.append(str(yx))
+        self.textBrowser.append(str(xn))
+        self.textBrowser.append(str(yn))
+        self.textBrowser.append(str(dir_))
+        self.textBrowser.append(str(grad))
+        """
         #for i in eq:
         #    cc_midPointList.append(i.asPoint())
         #temporary
-        #pointToLine(cc_midPointList)
-        #self.textBrowser.append(str(len(cc_midPointList)))
+        pointToLine(cc_midPointList)
+        self.textBrowser.append(str(len(cc_midPointList)))
         '''for i in cc_midPointList:
             self.textBrowser.append(str(i))'''
         # compare ver1 vs ver2

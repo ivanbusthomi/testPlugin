@@ -1,6 +1,7 @@
 from qgis.core import *
 import math
 
+def init():
 lay=iface.mapCanvas().layers()
 pLayerA=lay[0]
 pLayerB=lay[1]
@@ -10,13 +11,57 @@ fStartA=startA[0]
 fStartB=startB[0]
 pStartA=fStartA.geometry().asPoint()
 pStartB=fStartB.geometry().asPoint()
-
+#-------------------
 endA=pLayerA.selectedFeatures()
 endB=pLayerB.selectedFeatures()
-fEndB=endB[0]
-fEndA=endA[0]
+fEndB=endB[1]
+fEndA=endA[1]
 pEndA=fEndA.geometry().asPoint()
 pEndB=fEndB.geometry().asPoint()
+    
+
+def addPointL(list_of_pointGeom):
+    pointLayer = QgsVectorLayer("Point","Point", "memory")
+    pointProv = pointLayer.dataProvider()
+    lFeat=[]
+    for p in list_of_pointGeom:
+        pFeat = QgsFeature()
+        pFeat.setGeometry(p)
+        lFeat.append(pFeat)
+    pointProv.addFeatures(lFeat)
+    QgsMapLayerRegistry.instance().addMapLayer(pointLayer)
+
+def addPointG(pointGeom):
+    pointLayer = QgsVectorLayer("Point","Point", "memory")
+    pFeat = QgsFeature()
+    pFeat.setGeometry(pointGeom)
+    pointProv = pointLayer.dataProvider()
+    pointProv.addFeatures([pFeat])
+    QgsMapLayerRegistry.instance().addMapLayer(pointLayer)
+
+def addPointF(pointFeatures):
+    pointLayer = QgsVectorLayer("Point","Point Layer", "memory")
+    #pFeat = QgsFeature()
+    #pFeat.setGeometry(pointGeom)
+    pointProv = pointLayer.dataProvider()
+    pointProv.addFeatures(pointFeatures)
+    QgsMapLayerRegistry.instance().addMapLayer(pointLayer)
+
+def addLine(lineGeom):
+    lineLayer = QgsVectorLayer("LineString","Line Result", "memory")
+    lFeat = QgsFeature()
+    lFeat.setGeometry(lineGeom)
+    lineProv = lineLayer.dataProvider()
+    lineProv.addFeatures([lFeat])
+    QgsMapLayerRegistry.instance().addMapLayer(lineLayer)
+
+def addPoly(polyGeom):
+    polyLayer = QgsVectorLayer("Polygon","Polygon Result", "memory")
+    pFeat = QgsFeature()
+    pFeat.setGeometry(polyGeom)
+    polyProv = polyLayer.dataProvider()
+    polyProv.addFeatures([pFeat])
+    QgsMapLayerRegistry.instance().addMapLayer(polyLayer)
 
 def midPoint(point1,point2):        # working fine
     #this function returns midpoint from two input point as result.
@@ -50,85 +95,110 @@ def direction(pStartA,pStartB,pEndA,pEndB):
     return dir_
 
 def perpendicularLine(pointA,pointB,pEndA,pEndB,pLayerA,pLayerB):
-    # this function is to find a line that is perpendicular to line AB at its midpoint
-    # param 1 and 2 type is point
-
     x1 = pointA.x()
     y1 = pointA.y()
     x2 = pointB.x()
     y2 = pointB.y()
-
-    #middle coordinate as start point for perpendicular line
+    #-----------------------------------------
     middleCoord = midPoint(pointA,pointB)
     middlePoint = QgsPoint(middleCoord[0],middleCoord[1])
-    xm = middlePoint.x()
-    ym = middlePoint.y()
+    xMid = middlePoint.x()
+    yMid = middlePoint.y()
     #-------------------------------------
     # get max extent value from both point layer
-    extA = pLayerA.extent()
-    extB = pLayerB.extent()
+    extA = pLayerA.boundingBoxOfSelected()
+    extB = pLayerB.boundingBoxOfSelected()
     #maximum value
-    if extA.xMaximum() > extB.xMaximum():               #define xmax
-        xmax = extA.xMaximum()
+    if extA.xMaximum() > extB.xMaximum():
+        xMax = extA.xMaximum()
     else:
-        xmax = extB.xMaximum()
-    if extA.xMinimum() < extB.xMinimum():               #define xmin
-        xmin = extA.xMinimum()
+        xMax = extB.xMaximum()
+    if extA.xMinimum() < extB.xMinimum():
+        xMin = extA.xMinimum()
     else:
-        xmin = extB.xMinimum()
+        xMin = extB.xMinimum()
     #minimum value
-    if extA.yMaximum() > extB.yMaximum():               #define xmax
-        ymax = extA.yMaximum()
+    if extA.yMaximum() > extB.yMaximum():
+        yMax = extA.yMaximum()
     else:
-        ymax = extB.yMaximum()
-    if extA.yMinimum() < extB.yMinimum:                 #define xmax
-        ymin = extA.yMinimum()
+        yMax = extB.yMaximum()
+    if extA.yMinimum() < extB.yMinimum:
+        yMin = extA.yMinimum()
     else:
-        ymin = extB.yMinimum()
+        yMin = extB.yMinimum()
+    print "max = " , xMax,yMax
+    print "min = " , xMin,yMin
     # in order to shorten the equation
     P = x2 - x1
     Q = y2 - y1
-    R = xm - x1
-    S = ym - y1
+    R = xMid - x1
+    S = yMid - y1
     # line gradien, for determining max distance of perpendicular line
     gradien1 = Q / P
     gradien2 = -1/gradien1
     #-------------------------------------
     u = R / P
-    #u_ = S / Q                                                      # optional value, only for checking
-    d2 = pointA.sqrDist(pointB)                                     # d is the distance. d2 is square of d
+    #u_ = S / Q
+    d2 = pointA.sqrDist(pointB)
     #-------------------------------------
-    # here comes the equation
-    # y3*Q = (-P)*x3 + P*x1 + Q*y1 + u*d2
-    # x3*P = (-Q)*y3 + P*x1 + Q*y1 + u*d2
-    #-------------------------------------
-    # we want the perpendicular line goes until the maximum value of pointA and B, just to make sure it works
-    # in any shape of topography,,,,,,,,,, or maybe minimum value of pointA and B. need more consideration later.
     dir_ = direction(pointA,pointB,pEndA,pEndB)
     if dir_ == 1:                  # line direction is up-right
-        xlim = xmax
-        ylim = ymax
+        if math.pow(gradien2,2) > 1:
+            print dir_, ", grad >1, ", yMax
+            y3 = yMax
+            x3 = ((-Q)*y3 + P*x1 + Q*y1 + u*d2) / P
+        else:
+            print dir_, ", grad <1, ", xMax
+            x3 = xMax
+            y3 = ((-P)*x3 + P*x1 + Q*y1 + u*d2) / Q
+        #xlim = xMax
+        #ylim = yMax
     elif dir_ == 2:                # line direction is down-right
-        xlim = xmax
-        ylim = ymin
+        if math.pow(gradien2,2) > 1:
+            print dir_, ", grad >1, ", yMin
+            y3 = yMin
+            x3 = ((-Q)*y3 + P*x1 + Q*y1 + u*d2) / P
+        else:
+            print dir_, ", grad <1, ", xMax
+            x3 = xMax
+            y3 = ((-P)*x3 + P*x1 + Q*y1 + u*d2) / Q
+    #    xlim = xMax
+    #    ylim = yMin
     elif dir_ == 3:                # line direction is up-left
-        xlim = xmin
-        ylim = ymax
+        if math.pow(gradien2,2) > 1:
+            print dir_, ", grad >1, ", yMax
+            y3 = yMax
+            x3 = ((-Q)*y3 + P*x1 + Q*y1 + u*d2) / P
+        else:
+            print dir_, ", grad <1, ", xMin
+            x3 = xMin
+            y3 = ((-P)*x3 + P*x1 + Q*y1 + u*d2) / Q
+        #xlim = xMin
+        #ylim = yMax
     elif dir_ == 4:                # line direction is down-left
-        xlim = xmin
-        ylim = ymin
+        if math.pow(gradien2,2) > 1:
+            print dir_, ", grad >1, ", yMin
+            y3 = yMin
+            x3 = ((-Q)*y3 + P*x1 + Q*y1 + u*d2) / P
+        else:
+            print dir_, ", grad <1, ", xMin
+            x3 = xMin
+            y3 = ((-P)*x3 + P*x1 + Q*y1 + u*d2) / Q
+        #xlim = xMin
+        #ylim = yMin
+
     #--------------------------------------------------------
-    if math.pow(gradien2,2) > 1:                        #define x3 and y3, which are the second point coordinates of ppLine
-        y3 = ylim
-        x3 = ((-Q)*y3 + P*x1 + Q*y1 + u*d2) / P
-    else:
-        x3 = xlim
-        y3 = ((-P)*x3 + P*x1 + Q*y1 + u*d2) / Q
+    #if math.pow(gradien2,2) > 1:
+    #    y3 = ylim
+    #    x3 = ((-Q)*y3 + P*x1 + Q*y1 + u*d2) / P
+    #else:
+    #    x3 = xlim
+    #    y3 = ((-P)*x3 + P*x1 + Q*y1 + u*d2) / Q
     #-------------------------------------
-    ppdPoint = QgsPoint(x3,y3)                          # create it as Point
-    pointList = []                                      # create list to contain point for line creation
-    pointList.append(middlePoint)                       # insert 1st point, which is mid point
-    pointList.append(ppdPoint)                          # insert 2nd point, the one we just calculate
+    ppdPoint = QgsPoint(x3,y3)
+    pointList = []
+    pointList.append(middlePoint)
+    pointList.append(ppdPoint)
     #-------------------------------------
-    p3Line = QgsGeometry.fromPolyline(pointList)        # create line geometry from list of point
-    return p3Line                                               # return the result.its type is QgsGeometry
+    p3Line = QgsGeometry.fromPolyline(pointList)
+    return p3Line
