@@ -227,14 +227,13 @@ def intersected(geom,list_of_feat):           #STATUS : working
             list_of_result.append(f)
     return list_of_result
 
-def iteratePoint(startA,startB,pEndA,pEndB,pLayerA,pLayerB,itv):
+def iteratePoint(startA,startB,pEndA,pEndB,jLayer,itv):
     #param 1 and 2 type is point, param 3 and 4 type i point Layer, param 5 type is integer
     #output two list which contain list of three points (list_threePoint),
     #and list of equidistance point result (list_equiPoint)
     #p = point type, g=geom type , f = feature type
     dir_ = direction(startA,startB,pEndA,pEndB)                          #                                           OK
-    g_ppLine = perpendicularLine(startA,startB,pLayerA,pLayerB,dir_)   # create ppLine geom                             OK
-    joinLayer = join(pLayerA,pLayerB)                                                                                      #OK
+    g_ppLine = perpendicularLine(startA,startB,pLayerA,pLayerB,dir_)   # create ppLine geom                             OK                                                                                 #OK
     cDistance = 0                                 # current distance. used for creating point along ppLine geom
     stop = 0
     r=QgsFeature()
@@ -244,7 +243,7 @@ def iteratePoint(startA,startB,pEndA,pEndB,pLayerA,pLayerB,itv):
         #eG = QgsGeometry.fromPoint(eP)              # geometry eP
         dA = distanceFromPoints(startA, equiGeom.asPoint())
         buffer = equiGeom.buffer(dA,15)
-        res =  intersected(buffer,joinLayer)
+        res =  intersected(buffer,jLayer)
         cDistance = cDistance + itv
         if len(res)>1:
             r=nearestPoint(equiGeom.asPoint(),res)
@@ -256,19 +255,26 @@ def iteratePoint(startA,startB,pEndA,pEndB,pLayerA,pLayerB,itv):
             continue
     else:
         stop = 1
-    return equiGeom,r, stop
+    return equiGeom,r, stop, g_ppLine, buffer
 
-def removePoint(jLayer,p1,p2,f):
+def removePoint(jLayer,p1,p2,p3):
     for j in jLayer:
-        if j.geometry().asPoint()==p1:
-            jLayer.remove(j)
-        if j.geometry().asPoint()==p2:
-            jLayer.remove(j)
-        if j==f:
+        if j.geometry().asPoint()==p1 or j.geometry().asPoint()==p2 or j.geometry().asPoint()==p3.geometry().asPoint():
             jLayer.remove(j)
     return jLayer
 
-def deploy(pStartA,pStartB,pEndA,pEndB,pLayerA,pLayerB,itv):
+def deploy(pLayerA,pLayerB,itv):
+    pointListA=[]
+    pointListB=[]
+    for a in pLayerA.getFeatures():
+        pointListA.append(a)
+    for b in pLayerB.getFeatures():
+        pointListB.append(b)
+    pStartA= pointListA[0].geometry().asPoint()
+    pStartB= pointListB[0].geometry().asPoint()
+    pEndA= pointListA[-1].geometry().asPoint()
+    pEndB= pointListA[-1].geometry().asPoint()
+    #-------------------
     list_equiPoint = []
     list_thirdPoint = []
     jLayer = join(pLayerA,pLayerB)
@@ -276,7 +282,7 @@ def deploy(pStartA,pStartB,pEndA,pEndB,pLayerA,pLayerB,itv):
     pIterB = pStartB
     stop = 0
     while stop ==0 :
-        eqPoint,thirdPoint,stop = iteratePoint(pIterA,pIterB,pEndA,pEndB,pLayerA,pLayerB,itv)
+        eqPoint,thirdPoint,stop = iteratePoint(pIterA,pIterB,pEndA,pEndB,jLayer,itv)
         #print stop
         jLayer = removePoint(jLayer,pIterA,pIterB,thirdPoint)
         if stop ==0:

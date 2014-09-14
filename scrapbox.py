@@ -3,8 +3,9 @@ import math
 
 def init():
 lay=iface.mapCanvas().layers()
-pLayerA=lay[0]
-pLayerB=lay[1]
+layerA=lay[0]
+layerB=lay[1]
+
 startB=pLayerB.selectedFeatures()
 startA=pLayerA.selectedFeatures()
 fStartA=startA[0]
@@ -32,7 +33,7 @@ def addPointL(list_of_pointGeom):
     QgsMapLayerRegistry.instance().addMapLayer(pointLayer)
 
 def addPointG(pointGeom):
-    pointLayer = QgsVectorLayer("Point","Point", "memory")
+    pointLayer = QgsVectorLayer("point?crs=epsg:32749","Point", "memory")
     pFeat = QgsFeature()
     pFeat.setGeometry(pointGeom)
     pointProv = pointLayer.dataProvider()
@@ -48,7 +49,7 @@ def addPointF(pointFeatures):
     QgsMapLayerRegistry.instance().addMapLayer(pointLayer)
 
 def addLine(lineGeom):
-    lineLayer = QgsVectorLayer("LineString","Line Result", "memory")
+    lineLayer = QgsVectorLayer("LineString?crs=epsg:32749","Line Result", "memory")
     lFeat = QgsFeature()
     lFeat.setGeometry(lineGeom)
     lineProv = lineLayer.dataProvider()
@@ -56,7 +57,7 @@ def addLine(lineGeom):
     QgsMapLayerRegistry.instance().addMapLayer(lineLayer)
 
 def addPoly(polyGeom):
-    polyLayer = QgsVectorLayer("Polygon","Polygon Result", "memory")
+    polyLayer = QgsVectorLayer("Polygon?crs=epsg:32749","Polygon Result", "memory")
     pFeat = QgsFeature()
     pFeat.setGeometry(polyGeom)
     polyProv = polyLayer.dataProvider()
@@ -202,3 +203,53 @@ def perpendicularLine(pointA,pointB,pEndA,pEndB,pLayerA,pLayerB):
     #-------------------------------------
     p3Line = QgsGeometry.fromPolyline(pointList)
     return p3Line
+
+"""
+TEEEEEEEEEESSSSSSSSSSSSSTTTTTTTTTTTTTTT
+"""
+#def deploy(pLayerA,pLayerB,itv):
+pLayerA = lineToPoint(layerA,"A")
+pLayerB = lineToPoint(layerB,"B")
+pLayerA.startEditing()                      #tricky stuff.i am too lazy
+pLayerA.commitChanges()
+pLayerB.startEditing()
+pLayerB.commitChanges()
+pointListA=[]
+pointListB=[]
+for a in pLayerA.getFeatures():
+    pointListA.append(a)
+for b in pLayerB.getFeatures():
+    pointListB.append(b)
+pStartA= pointListA[0].geometry().asPoint()
+pStartB= pointListB[0].geometry().asPoint()
+pEndA= pointListA[-1].geometry().asPoint()
+pEndB= pointListA[-1].geometry().asPoint()
+#-------------------
+list_equiPoint = []
+list_thirdPoint = []
+jLayer = join(pLayerA,pLayerB)
+pIterA = pStartA
+pIterB = pStartB
+stop = 0
+while stop ==0 :
+    
+eqPoint,thirdPoint,stop,line,buffer = iteratePoint(pIterA,pIterB,pEndA,pEndB,jLayer,50)
+#print stop, len(jLayer)
+jLayer = removePoint(jLayer,pIterA,pIterB,thirdPoint)
+addPointG(eqPoint)
+addPointG(thirdPoint.geometry())
+addLine(line)
+addPoly(buffer)
+if stop ==0:
+    list_thirdPoint.append([pIterA, pIterB, thirdPoint.geometry().asPoint()])
+    list_equiPoint.append(eqPoint)
+    if thirdPoint['ket']=='A':
+        pIterA=thirdPoint.geometry().asPoint()
+        print "A changed",pIterA,thirdPoint['fid']
+    elif thirdPoint['ket']=='B':
+        pIterB=thirdPoint.geometry().asPoint()
+        print "B changed",pIterB,thirdPoint['fid']
+        
+else:
+    print "stop !=0"
+return list_equiPoint,list_thirdPoint
