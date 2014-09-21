@@ -5,17 +5,17 @@ import math
 def circumCenter(pointA, pointB, pointC):
     xA=pointA.x()
     yA=pointA.y()
-
+    #---------------------
     xB=pointB.x()
     yB=pointB.y()
-
+    #---------------------
     xC=pointC.x()
     yC=pointC.y()
-
+    #---------------------
     a2 = pow(xA,2)+pow(yA,2)
     b2 = pow(xB,2)+pow(yB,2)
     c2 = pow(xC,2)+pow(yC,2)
-
+    #---------------------
     const = 2*(xA*(yB-yC)+xB*(yC-yA)+xC*(yA-yB))
     xO = (a2*(yB-yC)+b2*(yC-yA)+c2*(yA-yB))/const
     yO = (a2*(xC-xB)+b2*(xA-xC)+c2*(xB-xA))/const
@@ -23,35 +23,28 @@ def circumCenter(pointA, pointB, pointC):
     return pointO
 
 def lineToPoint(lineLayer,attr):                                       # STATUS : working      OUTPUT : memory layer
-    #from PyQt4.QtCore import QVariant
-    # function to convert line feature to point feature
-    # PS: add function to add Attribute of A and B layer, to differentiate in processing later
-    pointLayer = QgsVectorLayer("Point", "Point Result", "memory")
-    prPoint = pointLayer.dataProvider()
-    # add attribute collumns
-    prPoint.addAttributes([QgsField("fid",QVariant.Int),QgsField("ket",QVariant.String)])
+    pointLayer = QgsVectorLayer("Point?crs=EPSG:32749", "Point Result", "memory")
+    layerProv = pointLayer.dataProvider()
+    layerProv.addAttributes([QgsField("fid",QVariant.Int),QgsField("ket",QVariant.String)])
     feats = []
-    for line in lineLayer.getFeatures():
-        #get coordinate list from asPolyline function
-        lineGeom = line.geometry()
-        listCoord = lineGeom.asPolyline()
-        inc = 0
-        #convert to point
-        for c in listCoord:
-            increase = inc
-            point = QgsPoint(c[0],c[1])
-            geomPoint = QgsGeometry.fromPoint(point)
-            #feat = QgsFeature(fields_)
-            feat = QgsFeature()
-            feat.setGeometry(geomPoint)
-            # add atributes
-            feat.setAttributes([increase,attr])
-            inc = increase + 1
-            feats.append(feat)
-        prPoint.addFeatures(feats)
-        QgsMapLayerRegistry.instance().addMapLayer(pointLayer)                      #add to defined point layer
+    list =[]
+    id = 0
+    for lineFeature in lineLayer.getFeatures():
+        listLineCoord = lineFeature.geometry().asPolyline()
+        for coord in listLineCoord:
+            list.append(coord)
+    for coord in list:
+        point = QgsPoint(coord[0],coord[1])
+        pGeom = QgsGeometry.fromPoint(point)
+        pFeat = QgsFeature()
+        pFeat.setGeometry(pGeom)
+        pFeat.setAttributes([id,attr])
+        id +=1
+        feats.append(pFeat)    
+    layerProv.addFeatures(feats)
+    QgsMapLayerRegistry.instance().addMapLayer(pointLayer)
     return pointLayer
-
+    
 def pointToLine(pointList):                                    # STATUS : working      OUTPUT : memory layer
     # function to convert point features to line feature
     #canvas = iface.mapCanvas()
@@ -80,8 +73,6 @@ def midPoint(point1,point2):        # working fine
 
 def direction(pStartA,pStartB,pEndA,pEndB):
     # this function is to dynamically define direction for perpendicular line creation
-    #extA= pLayerA.extent()
-    #extB= pLayerB.extent()
     m_start= midPoint(pStartA,pStartB)
     m_end= midPoint(pEndA,pEndB)
     pm_start = QgsPoint(m_start[0],m_start[1])
@@ -96,7 +87,8 @@ def direction(pStartA,pStartB,pEndA,pEndB):
             dir_ = 3
         elif pm_start.y()>pm_end.y():
             dir_ = 4
-    return dir_
+    grad_ = (pm_end.y()-pm_start.y())/(pm_end.x()-pm_start.x())
+    return dir_,grad_
 
 def perpendicularLine(pointA,pointB,pLayerA,pLayerB,dir_):
     # this function is to find a line that is perpendicular to line AB at its midpoint
@@ -218,6 +210,7 @@ def join(pLayerA,pLayerB):
     mC = aC + bC
     return mC       #return list of feature
 
+"""
 def intersected(geom,list_of_feat):           #STATUS : working
     list_of_result=[]
     for f in list_of_feat:
@@ -226,24 +219,79 @@ def intersected(geom,list_of_feat):           #STATUS : working
         if fGeom.intersects(geom):
             list_of_result.append(f)
     return list_of_result
+"""
 
-def iteratePoint(startA,startB,pEndA,pEndB,jLayer,itv):
+def sortList(featureList,grad,dir_):
+    point_list = []
+    for f in featureList:
+        point_list.append(f.geometry().asPoint())
+    if dir_ == 1:
+        if grad >1:
+            sorted_point_list = sorted(point_list,key=lambda x:x[1])
+        elif grad<1:
+            sorted_point_list = sorted(point_list,key=lambda x:x[0])
+    elif dir_ == 2:
+        if grad >1:
+            sorted_point_list = sorted(point_list,key=lambda x:x[1], reverse = True)
+        elif grad<1:
+            sorted_point_list = sorted(point_list,key=lambda x:x[0])
+    elif dir_ == 3:
+        if grad >1:
+            sorted_point_list = sorted(point_list,key=lambda x:x[1])
+        elif grad<1:
+            sorted_point_list = sorted(point_list,key=lambda x:x[0], reverse = True)
+    elif dir_ == 4:
+        if grad >1:
+            sorted_point_list = sorted(point_list,key=lambda x:x[1], reverse = True)
+        elif grad<1:
+            sorted_point_list = sorted(point_list,key=lambda x:x[0], reverse = True)
+    return point_list
+def pointlistToFeature(pointList,attr):
+    feature_list=[]
+    field_fid = QgsField("fid",QVariant.Int)
+    field_ket = QgsField("ket",QVariant.String)
+    fields = QgsFields()
+    fields.append(field_fid)
+    fields.append(field_ket)
+    id = 0
+    for coord in pointList:
+        pt = QgsPoint(coord[0],coord[1])
+        feat_geom = QgsGeometry.fromPoint(pt)
+        feat=QgsFeature(fields)
+        feat.setGeometry(feat_geom)
+        feat.setAttributes([id,attr])
+        id+=1
+        feature_list.append(feat)
+    #add result as layer
+    #pointLayer = QgsVectorLayer("Point","Sorted Point", "memory")
+    #pointProv = pointLayer.dataProvider()
+    #pointProv.addAttributes(fields)
+    #pointProv.addFeatures(feature_list)
+    #QgsMapLayerRegistry.instance().addMapLayer(pointLayer)
+    return feature_list
+def iteratePoint(startA,startB,fListA,fListB,g_ppLine,dir_,grad_,itv):
     #param 1 and 2 type is point, param 3 and 4 type i point Layer, param 5 type is integer
     #output two list which contain list of three points (list_threePoint),
     #and list of equidistance point result (list_equiPoint)
     #p = point type, g=geom type , f = feature type
-    dir_ = direction(startA,startB,pEndA,pEndB)                          #                                           OK
-    g_ppLine = perpendicularLine(startA,startB,pLayerA,pLayerB,dir_)   # create ppLine geom                             OK                                                                                 #OK
+    #--------------------------------------------------------sort by max-min coordinate
+    sorted_pointA = sortList(fListA,grad_,dir_)
+    sorted_pointB = sortList(fListB,grad_,dir_)
+    sorted_featuresA = pointlistToFeature(sorted_pointA,"A")
+    sorted_featuresB = pointlistToFeature(sorted_pointB,"B")
+    #--------------------------------------------------------
     cDistance = 0                                 # current distance. used for creating point along ppLine geom
     stop = 0
     r=QgsFeature()
-    #equiGeom = QgsGeometry()
+    #buffer = QgsGeometry()
+    equiGeom = QgsGeometry()
     while cDistance < g_ppLine.length():
         equiGeom = g_ppLine.interpolate(cDistance)        # equidistance point candidate
         #eG = QgsGeometry.fromPoint(eP)              # geometry eP
         dA = distanceFromPoints(startA, equiGeom.asPoint())
+        #dB = distanceFromPoints(startB, equiGeom.asPoint())
         buffer = equiGeom.buffer(dA,15)
-        res =  intersected(buffer,jLayer)
+        res =  intersectedNew(buffer,sorted_featuresA,sorted_featuresB,startA,startB,dir_ ,grad_)
         cDistance = cDistance + itv
         if len(res)>1:
             r=nearestPoint(equiGeom.asPoint(),res)
@@ -255,7 +303,7 @@ def iteratePoint(startA,startB,pEndA,pEndB,jLayer,itv):
             continue
     else:
         stop = 1
-    return equiGeom,r, stop, g_ppLine, buffer
+    return equiGeom,r, stop #, g_ppLine, buffer   #geom,feat,int,geom,geom,int,list
 
 def removePoint(jLayer,p1,p2,p3):
     for j in jLayer:
@@ -263,38 +311,130 @@ def removePoint(jLayer,p1,p2,p3):
             jLayer.remove(j)
     return jLayer
 
-def deploy(pLayerA,pLayerB,itv):
-    pointListA=[]
-    pointListB=[]
-    for a in pLayerA.getFeatures():
-        pointListA.append(a)
-    for b in pLayerB.getFeatures():
-        pointListB.append(b)
-    pStartA= pointListA[0].geometry().asPoint()
-    pStartB= pointListB[0].geometry().asPoint()
-    pEndA= pointListA[-1].geometry().asPoint()
-    pEndB= pointListA[-1].geometry().asPoint()
-    #-------------------
-    list_equiPoint = []
-    list_thirdPoint = []
-    jLayer = join(pLayerA,pLayerB)
-    pIterA = pStartA
-    pIterB = pStartB
+
+def addPointL(list_of_pointGeom):
+    pointLayer = QgsVectorLayer("Point","Point", "memory")
+    pointProv = pointLayer.dataProvider()
+    lFeat=[]
+    for p in list_of_pointGeom:
+        pFeat = QgsFeature()
+        pFeat.setGeometry(p)
+        lFeat.append(pFeat)
+    pointProv.addFeatures(lFeat)
+    QgsMapLayerRegistry.instance().addMapLayer(pointLayer)
+
+def addPointG(pointGeom):
+    pointLayer = QgsVectorLayer("point?crs=epsg:32749","Point", "memory")
+    pFeat = QgsFeature()
+    pFeat.setGeometry(pointGeom)
+    pointProv = pointLayer.dataProvider()
+    pointProv.addFeatures([pFeat])
+    QgsMapLayerRegistry.instance().addMapLayer(pointLayer)
+
+def addPointF(pointFeatures):
+    pointLayer = QgsVectorLayer("Point","Point Layer", "memory")
+    #pFeat = QgsFeature()
+    #pFeat.setGeometry(pointGeom)
+    pointProv = pointLayer.dataProvider()
+    pointProv.addFeatures(pointFeatures)
+    QgsMapLayerRegistry.instance().addMapLayer(pointLayer)
+
+def addLine(lineGeom):
+    lineLayer = QgsVectorLayer("LineString?crs=epsg:32749","Line Result", "memory")
+    lFeat = QgsFeature()
+    lFeat.setGeometry(lineGeom)
+    lineProv = lineLayer.dataProvider()
+    lineProv.addFeatures([lFeat])
+    QgsMapLayerRegistry.instance().addMapLayer(lineLayer)
+
+def addPoly(polyGeom):
+    polyLayer = QgsVectorLayer("Polygon?crs=epsg:32749","Polygon Result", "memory")
+    pFeat = QgsFeature()
+    pFeat.setGeometry(polyGeom)
+    polyProv = polyLayer.dataProvider()
+    polyProv.addFeatures([pFeat])
+    QgsMapLayerRegistry.instance().addMapLayer(polyLayer)
+
+def intersectedNew(buffer,fListA,fListB,startA,startB,dir_,grad):
+    list_of_result = []
+    for feature in fListA:
+        f_geom=feature.geometry()
+        f_point=f_geom.asPoint()
+        if dir_ == 1 and f_geom.intersects(buffer):
+            if grad >1 and f_point.y()>startA.y():
+                list_of_result.append(feature)
+            elif grad<1 and f_point.x()>startA.x():
+                list_of_result.append(feature)
+        elif dir_ == 2 and f_geom.intersects(buffer):
+            if grad >1 and f_point.y()<startA.y():
+                list_of_result.append(feature)
+            elif grad<1 and f_point.x()>startA.x():
+                list_of_result.append(feature)
+        elif dir_ == 3 and f_geom.intersects(buffer):
+            if grad >1 and f_point.y()>startA.y():
+                list_of_result.append(feature)
+            elif grad<1 and f_point.x()<startA.x():
+                list_of_result.append(feature)
+        elif dir_ == 4 and f_geom.intersects(buffer):
+            if grad >1 and f_point.y()<startA.y():
+                list_of_result.append(feature)
+            elif grad<1 and f_point.x()<startA.x():
+                list_of_result.append(feature)
+    #feature B
+    for feature in fListB:
+        f_geom=feature.geometry()
+        f_point=f_geom.asPoint()
+        if dir_ == 1 and f_geom.intersects(buffer):
+            if grad >1 and f_point.y()>startB.y():
+                list_of_result.append(feature)
+            elif grad<1 and f_point.x()>startB.x():
+                list_of_result.append(feature)
+        elif dir_ == 2 and f_geom.intersects(buffer):
+            if grad >1 and f_point.y()<startB.y():
+                list_of_result.append(feature)
+            elif grad<1 and f_point.x()>startB.x():
+                list_of_result.append(feature)
+        elif dir_ == 3 and f_geom.intersects(buffer):
+            if grad >1 and f_point.y()>startB.y():
+                list_of_result.append(feature)
+            elif grad<1 and f_point.x()<startB.x():
+                list_of_result.append(feature)
+        elif dir_ == 4 and f_geom.intersects(buffer):
+            if grad >1 and f_point.y()<startB.y():
+                list_of_result.append(feature)
+            elif grad<1 and f_point.x()<startB.x():
+                list_of_result.append(feature)
+    #result returned
+    return list_of_result
+
+def deploy(p_start_a, p_start_b, p_end_a, p_end_b,point_layer_a,point_layer_b):
+    list_equiGeom = []
+    list_thirdFeature = []
+    p_iter_a = p_start_a
+    p_iter_b = p_start_b
     stop = 0
-    while stop ==0 :
-        eqPoint,thirdPoint,stop = iteratePoint(pIterA,pIterB,pEndA,pEndB,jLayer,itv)
-        #print stop
-        jLayer = removePoint(jLayer,pIterA,pIterB,thirdPoint)
-        if stop ==0:
-            list_thirdPoint.append([pIterA, pIterB, thirdPoint.geometry().asPoint()])
-            list_equiPoint.append(eqPoint)
-            if thirdPoint['ket']=='A':
-                pIterA=thirdPoint.geometry().asPoint()
-                #print "A changed",pIterA,n['fid']
-            elif thirdPoint['ket']=='B':
-                pIterB=thirdPoint.geometry().asPoint()
-                #print "B changed",pIterB,n['fid']
+    list_feat_a=[]
+    list_feat_b=[]
+    for feature in point_layer_a.getFeatures():
+        list_feat_a.append(feature)
+    for feature in point_layer_b.getFeatures():
+        list_feat_b.append(feature)
+    # iterate
+    while stop == 0:
+        dir_,grad_ = direction(p_iter_a, p_iter_b, p_end_a, p_end_b)
+        g_pp_line = perpendicularLine(p_iter_a, p_iter_b ,point_layer_a ,point_layer_b ,dir_)
+        g_equi, f_third,stop= iteratePoint(p_iter_a,p_iter_b,list_feat_a,list_feat_b,g_pp_line,dir_,grad_,50)
+        if stop ==0 and f_third.geometry().asPoint()!=p_iter_a and f_third.geometry().asPoint()!=p_iter_b :
+            addPointG(g_equi)
+            addPointG(f_third.geometry())
+            list_equiGeom.append(g_equi)
+            list_thirdFeature.append([p_iter_a, p_iter_b, f_third.geometry().asPoint()])
+            if f_third['ket']=='A':
+                p_iter_a=f_third.geometry().asPoint()
+                print "A changed",p_iter_a,f_third['fid']
+            elif f_third['ket']=='B':
+                p_iter_b=f_third.geometry().asPoint()
+                print "B changed",p_iter_b,f_third['fid']
     else:
-        pass
-        #print "stop !=0"
-    return list_equiPoint,list_thirdPoint
+        print "stop !=0"
+    return list_equiGeom,list_thirdFeature
