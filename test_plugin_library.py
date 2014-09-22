@@ -77,6 +77,7 @@ def direction(pStartA,pStartB,pEndA,pEndB):
     m_end= midPoint(pEndA,pEndB)
     pm_start = QgsPoint(m_start[0],m_start[1])
     pm_end = QgsPoint(m_end[0],m_end[1])
+    dir_ = 0
     if pm_start.x()<pm_end.x():
         if pm_start.y()<pm_end.y():
             dir_ = 1
@@ -87,7 +88,12 @@ def direction(pStartA,pStartB,pEndA,pEndB):
             dir_ = 3
         elif pm_start.y()>pm_end.y():
             dir_ = 4
-    grad_ = (pm_end.y()-pm_start.y())/(pm_end.x()-pm_start.x())
+    dy = pm_end.y()-pm_start.y()
+    dx = pm_end.x()-pm_start.x()
+    if dx == 0:
+        grad_=5
+    else:
+        grad_ = dy/dx
     return dir_,grad_
 
 def perpendicularLine(pointA,pointB,pLayerA,pLayerB,dir_):
@@ -97,6 +103,8 @@ def perpendicularLine(pointA,pointB,pLayerA,pLayerB,dir_):
     y1 = pointA.y()
     x2 = pointB.x()
     y2 = pointB.y()
+    x3 = 0
+    y3 = 0
     #-------------------------------------
     middleCoord = midPoint(pointA,pointB)
     middlePoint = QgsPoint(middleCoord[0],middleCoord[1])
@@ -134,11 +142,19 @@ def perpendicularLine(pointA,pointB,pLayerA,pLayerB,dir_):
     R = xm - x1
     S = ym - y1
     # line gradien, for determining max distance of perpendicular line
-    gradien1 = Q / P
-    gradien2 = -1/gradien1
+    if P==0:
+        #gradien1 = infinity. the line is vertical.then gradien2 must be horizontal
+        gradien2 = 0
+        u = 0
+    elif Q==0:
+        #gradien1 = horizontal, then gradien2 must be vertical. so the gradien value is infinity
+        gradien2 = 2
+        u = R / P
+    else:
+        gradien1 = Q / P
+        gradien2 = -1/gradien1
+        u = R / P
     #-------------------------------------
-    u = R / P
-    u_ = S / Q                                                      # optional value, only for checking
     d2 = pointA.sqrDist(pointB)                                     # d is the distance. d2 is square of d
     #-------------------------------------
     # here comes the equation
@@ -210,17 +226,6 @@ def join(pLayerA,pLayerB):
     mC = aC + bC
     return mC       #return list of feature
 
-"""
-def intersected(geom,list_of_feat):           #STATUS : working
-    list_of_result=[]
-    for f in list_of_feat:
-        fGeom = f.geometry()
-        fPoint = fGeom.asPoint()
-        if fGeom.intersects(geom):
-            list_of_result.append(f)
-    return list_of_result
-"""
-
 def sortList(featureList,grad,dir_):
     point_list = []
     for f in featureList:
@@ -275,23 +280,23 @@ def iteratePoint(startA,startB,fListA,fListB,g_ppLine,dir_,grad_,itv):
     #and list of equidistance point result (list_equiPoint)
     #p = point type, g=geom type , f = feature type
     #--------------------------------------------------------sort by max-min coordinate
-    sorted_pointA = sortList(fListA,grad_,dir_)
-    sorted_pointB = sortList(fListB,grad_,dir_)
-    sorted_featuresA = pointlistToFeature(sorted_pointA,"A")
-    sorted_featuresB = pointlistToFeature(sorted_pointB,"B")
+    #sorted_pointA = sortList(fListA,grad_,dir_)
+    #sorted_pointB = sortList(fListB,grad_,dir_)
+    #sorted_featuresA = pointlistToFeature(sorted_pointA,"A")
+    #sorted_featuresB = pointlistToFeature(sorted_pointB,"B")
     #--------------------------------------------------------
     cDistance = 0                                 # current distance. used for creating point along ppLine geom
     stop = 0
     r=QgsFeature()
     #buffer = QgsGeometry()
     equiGeom = QgsGeometry()
-    while cDistance < g_ppLine.length():
+    while cDistance <= g_ppLine.length():
         equiGeom = g_ppLine.interpolate(cDistance)        # equidistance point candidate
         #eG = QgsGeometry.fromPoint(eP)              # geometry eP
         dA = distanceFromPoints(startA, equiGeom.asPoint())
         #dB = distanceFromPoints(startB, equiGeom.asPoint())
         buffer = equiGeom.buffer(dA,15)
-        res =  intersectedNew(buffer,sorted_featuresA,sorted_featuresB,startA,startB,dir_ ,grad_)
+        res =  intersectedNew(buffer,fListA,fListB,startA,startB,dir_ ,grad_)
         cDistance = cDistance + itv
         if len(res)>1:
             r=nearestPoint(equiGeom.asPoint(),res)
@@ -301,7 +306,7 @@ def iteratePoint(startA,startB,fListA,fListB,g_ppLine,dir_,grad_,itv):
             break
         elif len(res)==0:
             continue
-    else:
+    if cDistance > g_ppLine.length():
         stop = 1
     return equiGeom,r, stop #, g_ppLine, buffer   #geom,feat,int,geom,geom,int,list
 
@@ -361,22 +366,22 @@ def intersectedNew(buffer,fListA,fListB,startA,startB,dir_,grad):
         f_geom=feature.geometry()
         f_point=f_geom.asPoint()
         if dir_ == 1 and f_geom.intersects(buffer):
-            if grad >1 and f_point.y()>startA.y():
+            if grad >=1 and f_point.y()>startA.y():
                 list_of_result.append(feature)
             elif grad<1 and f_point.x()>startA.x():
                 list_of_result.append(feature)
         elif dir_ == 2 and f_geom.intersects(buffer):
-            if grad >1 and f_point.y()<startA.y():
+            if grad >=1 and f_point.y()<startA.y():
                 list_of_result.append(feature)
             elif grad<1 and f_point.x()>startA.x():
                 list_of_result.append(feature)
         elif dir_ == 3 and f_geom.intersects(buffer):
-            if grad >1 and f_point.y()>startA.y():
+            if grad >=1 and f_point.y()>startA.y():
                 list_of_result.append(feature)
             elif grad<1 and f_point.x()<startA.x():
                 list_of_result.append(feature)
         elif dir_ == 4 and f_geom.intersects(buffer):
-            if grad >1 and f_point.y()<startA.y():
+            if grad >=1 and f_point.y()<startA.y():
                 list_of_result.append(feature)
             elif grad<1 and f_point.x()<startA.x():
                 list_of_result.append(feature)
@@ -385,29 +390,29 @@ def intersectedNew(buffer,fListA,fListB,startA,startB,dir_,grad):
         f_geom=feature.geometry()
         f_point=f_geom.asPoint()
         if dir_ == 1 and f_geom.intersects(buffer):
-            if grad >1 and f_point.y()>startB.y():
+            if grad >=1 and f_point.y()>startB.y():
                 list_of_result.append(feature)
             elif grad<1 and f_point.x()>startB.x():
                 list_of_result.append(feature)
         elif dir_ == 2 and f_geom.intersects(buffer):
-            if grad >1 and f_point.y()<startB.y():
+            if grad >=1 and f_point.y()<startB.y():
                 list_of_result.append(feature)
             elif grad<1 and f_point.x()>startB.x():
                 list_of_result.append(feature)
         elif dir_ == 3 and f_geom.intersects(buffer):
-            if grad >1 and f_point.y()>startB.y():
+            if grad >=1 and f_point.y()>startB.y():
                 list_of_result.append(feature)
             elif grad<1 and f_point.x()<startB.x():
                 list_of_result.append(feature)
         elif dir_ == 4 and f_geom.intersects(buffer):
-            if grad >1 and f_point.y()<startB.y():
+            if grad >=1 and f_point.y()<startB.y():
                 list_of_result.append(feature)
             elif grad<1 and f_point.x()<startB.x():
                 list_of_result.append(feature)
     #result returned
     return list_of_result
 
-def deploy(p_start_a, p_start_b, p_end_a, p_end_b,point_layer_a,point_layer_b):
+def deploy(p_start_a, p_start_b, p_end_a, p_end_b,point_layer_a,point_layer_b,itv):
     list_equiGeom = []
     list_thirdFeature = []
     p_iter_a = p_start_a
@@ -423,10 +428,10 @@ def deploy(p_start_a, p_start_b, p_end_a, p_end_b,point_layer_a,point_layer_b):
     while stop == 0:
         dir_,grad_ = direction(p_iter_a, p_iter_b, p_end_a, p_end_b)
         g_pp_line = perpendicularLine(p_iter_a, p_iter_b ,point_layer_a ,point_layer_b ,dir_)
-        g_equi, f_third,stop= iteratePoint(p_iter_a,p_iter_b,list_feat_a,list_feat_b,g_pp_line,dir_,grad_,50)
+        g_equi, f_third,stop= iteratePoint(p_iter_a,p_iter_b,list_feat_a,list_feat_b,g_pp_line,dir_,grad_,itv)
         if stop ==0 and f_third.geometry().asPoint()!=p_iter_a and f_third.geometry().asPoint()!=p_iter_b :
             addPointG(g_equi)
-            addPointG(f_third.geometry())
+            #addPointG(f_third.geometry())
             list_equiGeom.append(g_equi)
             list_thirdFeature.append([p_iter_a, p_iter_b, f_third.geometry().asPoint()])
             if f_third['ket']=='A':
@@ -436,5 +441,5 @@ def deploy(p_start_a, p_start_b, p_end_a, p_end_b,point_layer_a,point_layer_b):
                 p_iter_b=f_third.geometry().asPoint()
                 print "B changed",p_iter_b,f_third['fid']
     else:
-        print "stop !=0"
+        print "Process has been stopped"
     return list_equiGeom,list_thirdFeature
